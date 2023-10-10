@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	boshcmd "github.com/cloudfoundry/bosh-cli/v7/cmd"
+	"github.com/cloudfoundry/bosh-cli/v7/cmd/completion"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -12,7 +14,6 @@ import (
 	boshlogfile "github.com/cloudfoundry/bosh-utils/logger/file"
 	boshsys "github.com/cloudfoundry/bosh-utils/system"
 
-	boshcmd "github.com/cloudfoundry/bosh-cli/v7/cmd"
 	bilog "github.com/cloudfoundry/bosh-cli/v7/logger"
 	boshui "github.com/cloudfoundry/bosh-cli/v7/ui"
 	boshuifmt "github.com/cloudfoundry/bosh-cli/v7/ui/fmt"
@@ -22,21 +23,31 @@ func main() {
 	logger := newLogger()
 	defer handlePanic()
 
-	ui := boshui.NewConfUI(logger)
-	defer ui.Flush()
-
-	cmdFactory := boshcmd.NewFactory(boshcmd.NewBasicDeps(ui, logger))
-
-	cmd, err := cmdFactory.New(os.Args[1:])
-	if err != nil {
-		fail(err, ui, logger)
-	}
-
-	err = cmd.Execute()
-	if err != nil {
-		fail(err, ui, logger)
+	if completion.IsItCompletionCommand(os.Args[1:]) {
+		// completion support
+		blindUi := boshui.NewWrappingConfUI(&completion.BlindUI{}, logger) // only completion can write to stdout
+		bc := completion.NewBoshComplete(blindUi, logger)
+		if _, err := bc.Execute(os.Args[1:]); err != nil {
+			fail(err, blindUi, logger)
+		}
 	} else {
-		success(ui, logger)
+		// regular commands
+		ui := boshui.NewConfUI(logger)
+		defer ui.Flush()
+
+		cmdFactory := boshcmd.NewFactory(boshcmd.NewBasicDeps(ui, logger))
+		cmd, err := cmdFactory.New(os.Args[1:])
+		if err != nil {
+			fail(err, ui, logger)
+
+		}
+
+		err = cmd.Execute()
+		if err != nil {
+			fail(err, ui, logger)
+		} else {
+			success(ui, logger)
+		}
 	}
 }
 

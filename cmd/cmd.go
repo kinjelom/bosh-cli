@@ -542,6 +542,10 @@ func (c Cmd) config() cmdconf.Config {
 	return config
 }
 
+func (c Cmd) ExportSession() Session {
+	return c.session()
+}
+
 func (c Cmd) session() Session {
 	return NewSessionFromOpts(c.BoshOpts, c.config(), c.deps.UI, true, true, c.deps.FS, c.deps.Logger)
 }
